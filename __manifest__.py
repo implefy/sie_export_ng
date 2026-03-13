@@ -5,7 +5,7 @@
     'author': 'Implefy AB',
     'license': 'LGPL-3',
     'category': 'Accounting/Localizations',
-    'depends': ['account_reports', 'l10n_se'],
+    'depends': ['account_reports'],
     'data': [
         'security/ir.model.access.csv',
         'wizard/sie_export_wizard_views.xml',
