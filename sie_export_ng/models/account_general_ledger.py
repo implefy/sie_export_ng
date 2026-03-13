@@ -80,6 +80,7 @@ class GeneralLedgerCustomHandler(models.AbstractModel):
                 'mode': 'range',
                 'filter': 'custom',
             },
+            'export_mode': 'file',
         })
 
     @api.model
@@ -171,6 +172,34 @@ class GeneralLedgerCustomHandler(models.AbstractModel):
         return sie4_coa_lines
 
     @api.model
+    def _get_sie4_initial_balances_values(self, report, options, filtered_accounts):
+        """Get initial balance values using the report engine's _get_lines method."""
+        def get_dict_values_from_report_line(line):
+            return {
+                'balance': line['columns'][colname_to_idx['balance']]['no_format'],
+                'debit': line['columns'][colname_to_idx['debit']]['no_format'],
+                'credit': line['columns'][colname_to_idx['credit']]['no_format'],
+            }
+        options = {
+            **options,
+            'unfold_all': True,
+        }
+        colname_to_idx = {col['expression_label']: idx for idx, col in enumerate(options.get('columns', []))}
+        lines = report._get_lines(options)
+        initial_balances = {}
+        account_by_ids = {account.id: account for account in filtered_accounts}
+        for line in lines:
+            _model, res_id = report._get_model_info_from_id(line['id'])
+
+            if isinstance(res_id, str) and 'balance_line' in res_id:
+                account_id = report._get_res_id_from_line_id(line['id'], 'account.account')
+                account = account_by_ids.get(account_id, False)
+                if account:
+                    initial_balances[account] = get_dict_values_from_report_line(line)
+
+        return initial_balances
+
+    @api.model
     def _export_sie4_bs_balance(self, options):
         """Generate IB/UB (opening/closing balance) lines for balance sheet accounts.
 
@@ -195,16 +224,12 @@ class GeneralLedgerCustomHandler(models.AbstractModel):
         report._init_currency_table(prev_year_options)
         report._init_currency_table(options)
         report._init_currency_table(next_year_options)
-        prev_ib_values = self.with_company(company_id)._get_initial_balance_values(
-            report, bs_accounts.mapped('id'), prev_year_options)
-        curr_ib_values = self.with_company(company_id)._get_initial_balance_values(
-            report, bs_accounts.mapped('id'), options)
-        next_ib_values = self.with_company(company_id)._get_initial_balance_values(
-            report, bs_accounts.mapped('id'), next_year_options)
+        prev_ib_values = self.with_company(company_id)._get_sie4_initial_balances_values(report, prev_year_options, bs_accounts)
+        curr_ib_values = self.with_company(company_id)._get_sie4_initial_balances_values(report, options, bs_accounts)
+        next_ib_values = self.with_company(company_id)._get_sie4_initial_balances_values(report, next_year_options, bs_accounts)
 
         for ib_values in (prev_ib_values, curr_ib_values, next_ib_values):
-            for account_id, (account, ib_map) in ib_values.items():
-                ib_item = next(iter(ib_map.values()))
+            for account, ib_item in ib_values.items():
                 if ib_item != {}:
                     seen_bs_account_codes.add(account.code)
                     if ib_values is prev_ib_values:
@@ -235,7 +260,7 @@ class GeneralLedgerCustomHandler(models.AbstractModel):
 
         common_domain = [
             ('account_id.include_initial_balance', '=', False),
-            ('display_type', 'not in', ('line_note', 'line_section')),
+            ('display_type', 'not in', ('line_section', 'line_subsection', 'line_note')),
         ]
         prev_year_domain = common_domain + [
             ('date', '>=', dates['prev_date_from']),
@@ -272,7 +297,7 @@ class GeneralLedgerCustomHandler(models.AbstractModel):
         sie4_verification_lines = []
         dates = self._get_sie4_dates(options)
         company_id = options['companies'][0]['id']
-        unsupported_display_type = {'line_note', 'line_section'}
+        unsupported_display_type = {'line_note', 'line_section', 'line_subsection'}
 
         moves = self.env['account.move'].with_company(company_id).search([
             ('state', '=', 'posted'),
@@ -332,6 +357,6 @@ class GeneralLedgerCustomHandler(models.AbstractModel):
 
         return {
             'file_name': f'sie4_export_{fields.Date.context_today(self).strftime(DATEFORMAT_SIE4)}.se',
-            'file_content': '\n'.join(content_lines).encode('ISO-8859-1', errors='replace'),
+            'file_content': '\n'.join(content_lines).encode('437'),
             'file_type': 'txt',
         }
