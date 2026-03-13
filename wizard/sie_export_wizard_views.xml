@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="sie_export_wizard_form_view" model="ir.ui.view">
+        <field name="name">sie.export.wizard.form</field>
+        <field name="model">sie.export.wizard</field>
+        <field name="arch" type="xml">
+            <form string="SIE 4 Export">
+                <group>
+                    <group>
+                        <field name="date_from"/>
+                        <field name="date_to"/>
+                    </group>
+                </group>
+                <footer>
+                    <button name="action_export" string="Export" type="object" class="btn-primary"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="sie_export_wizard_action" model="ir.actions.act_window">
+        <field name="name">SIE 4 Export</field>
+        <field name="res_model">sie.export.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+    <menuitem
+        id="menu_sie_export"
+        name="SIE Export"
+        parent="account.menu_finance_reports"
+        action="sie_export_wizard_action"
+        sequence="110"/>
+
+</odoo>
