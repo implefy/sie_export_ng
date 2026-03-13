@@ -3,7 +3,7 @@
     'summary': 'Export Accounting Data to SIE 4 files',
     'version': '19.0.1.0.0',
     'author': 'Implefy AB',
-    'license': 'Other proprietary',
+    'license': 'LGPL-3',
     'category': 'Accounting/Localizations',
     'depends': ['account_reports', 'l10n_se'],
     'data': [
